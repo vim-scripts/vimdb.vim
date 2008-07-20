@@ -1,0 +1,21 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=2304
+
+Unfortunatly nobody likes this script; it would be kind of you to let me know why.
+
+This plugin is useful to store information in a database-like design.
+Whilst opening a *.vimdb file, autocommands will be applied and open two windows. The left window gives a view on the table, the right window shows the record, the cursor is currently over (of course, after heaving created a new *.vimdb file, there will only be two empty windows shown). The first line of the table will become the header, which shows the names of the columns. For full instructions see readme, to have an idea, how a database will look like: look at example database shipped with the package.
+
+Note:
+1.) With the new improved (since version 0.5) TAB key mapping, editing the database will become a pleasure ;). 
+2.) Cleared many bugs to make script a bit more compatible to Vim movement/delete commands (cw, dw, D, C),
+     which might be useful editing records (But still the mighty TAB key dwarfs them all;).
+3.) Im through with bug removal, but there is still one, you should know: The table needs at least two columns to let the TAB key
+     work
+
+Be Warned:
+The development of the script has advanced, but  i would still not recommend to store important data to a *.vimdb file.
+
+
+Questions/Suggestions/Bug reports?
+Just compose a mail! (I dont promise to do anything but to be pleased to receive your mail. But just have a try) 
+benjaminschnitzler_at_gmail_dot_com
