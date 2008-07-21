@@ -22,10 +22,10 @@
 "Setting was moved into StartDb() due to otherwise beeing always
 "applied you open vim - sorry, my mistake.
 
-"if exists("vimdbplugin")
-"  finish
-"endif
-let vimdbplugin = 2
+if exists("vimdbplugin")
+  finish
+endif
+let vimdbplugin = 100
 
 "Autocommands
 au BufRead,BufNewFile                *.vimdb   call StartDb()
@@ -35,9 +35,9 @@ au BufLeave                          *.vimdb   call LeaveDb()
 au BufEnter,BufRead                  recordbuf call RecordbufMove()
 au BufEnter,BufRead                  recordbuf call EnterRecordbuf()
 au CursorMoved                       recordbuf call RecordbufMove()
+au InsertLeave                       recordbuf call RecordbufLeaveI()
 au InsertEnter                       recordbuf call RecordbufEnterI()
 au CursorMovedI                      recordbuf call RecordbufMoveI()
-au InsertLeave                       recordbuf call RecordbufLeaveI()
 au BufLeave                          recordbuf call LeaveRecordbuf()
 
 
@@ -151,17 +151,19 @@ func EnterRecordbuf()
 endfunc
 
 func RecordbufMove()
-  if virtcol('.') <= s:LONGEST+1
+  if s:DBPOS[1] == 1
+    call ChangeTableHeader(line('.'))
+    call RefreshHeader()
+    return
+  endif
+  if virtcol('.') <= s:LONGEST + 1
     call cursor(0,0,s:LONGEST+1)
   endif
-  if virtcol('.') <= s:LONGEST+1
-    execute "s/.*$/" . escape(s:DBHEAD[line('.')-1],'\/') . " -"
+  if virtcol('.') <= s:LONGEST + 1
+    execute "s/.*$/" . escape(s:DBHEAD[line('.')-1],'\/') . "  "
     call cursor(0,0,s:LONGEST+1)
   else
     call ChangeTableEntry(line('.'))
-    if s:DBPOS[1] == 1
-      call RefreshHeader()
-    endif
   endif
 endfunc
 
@@ -170,9 +172,13 @@ func RecordbufEnterI()
   let s:RECPOS = getpos('.')
   let s:RECBUF = getline('.')
   let s:RECLINES = line('$')
+  call RecordbufMove()
 endfunc
 
 func RecordbufMoveI()
+  if s:DBPOS[1] == 1
+    return
+  endif
   if line('$') < s:RECLINES
     call RefreshRecord()
     call setpos('.',s:RECPOS)
@@ -185,23 +191,44 @@ func RecordbufMoveI()
 endfunc
 
 func RecordbufLeaveI()
-  call ChangeTableEntry(line('.'))
   if s:DBPOS[1] == 1
     call RefreshHeader()
+    call ChangeTableHeader(line('.'))
+    return
   endif
+
+  call ChangeTableEntry(line('.'))
 
   if s:TABMODE == 1
     let ENTRY = GetRecEntry(line("."))
     if substitute(ENTRY, " ", "", "g") == ""
       call SetRecEntry(".", s:TABBUF)
+      call ToggleAutocmd()
+        let LINE = line('.')
+        d
+        call append(LINE-1,s:DBHEAD[LINE-1] . s:TABBUF )
+        call cursor(0,0,s:LONGEST+1)
+        if LINE < line("$")
+          normal k
+        else
+          normal j
+        endif
+        while virtcol('.') > s:LONGEST+2
+          normal h
+        endwhile
+      call ToggleAutocmd()
     endif
   endif
+
+  let s:TABMODE = 0
 endfunc
 
 func LeaveRecordbuf()
-  call ChangeTableEntry(line('.'))
   if s:DBPOS[1] == 1
+    call ChangeTableHeader(line('.'))
     call RefreshHeader()
+  else
+    call ChangeTableEntry(line('.'))
   endif
 endfunc
 
@@ -242,7 +269,8 @@ func RefreshRecord()
   %d _
   let INDEX = 0
   while INDEX < len(s:DBHEAD)
-    let ENTRY = s:DBHEAD[INDEX] . " " . get(LISTE,INDEX,"-")
+    let ENTRY = s:DBPOS[1] == 1 ? "" : s:DBHEAD[INDEX] . " "
+    let ENTRY = ENTRY . get(LISTE,INDEX,"-")
     call append(line('$'),ENTRY)
     let INDEX = INDEX + 1
   endwhile
@@ -273,6 +301,27 @@ func ChangeTableEntry( RECLINE )
   call ToggleAutocmd()
 endfunc
 
+func ChangeTableHeader( RECLINE )
+  call ToggleAutocmd()
+
+  let RECENTRY = DelTrailingSpaces(getline(a:RECLINE))
+  let RECENTRYL = Strlen(RECENTRY)
+
+  let RECPOS = getpos('.')
+  let TCOL = a:RECLINE
+
+  execute ':b ' . s:DBFILE
+  let RECENTRY = RECENTRY == "" ? "-" : RECENTRY
+
+  call InsertTableCell(RECENTRY, s:DBPOS[1], TCOL-1)
+  call AdjustColWidth( TCOL )
+
+  b! recordbuf
+  call setpos(".",RECPOS)
+
+  call ToggleAutocmd()
+endfunc
+
 
 "AddTableCol Functions
 func AddTableCol( MODE )
@@ -281,7 +330,7 @@ func AddTableCol( MODE )
 
   let PREPEND = a:MODE ==# "O"
 
-  if line('$') == line('.') && len(getline('.')) == 1
+  if line('$') == line('.') && len(DelTrailingSpaces(getline('.'))) == 0
     let s:FIRSTENTRY = 1
     startinsert
   else
@@ -312,7 +361,7 @@ func InsertTableCol( COL )
     let LEN = LEN - 1
   endwhile
 
-  let SEPERATOR = "<H>"
+  let SEPERATOR = a:COL == 0 ? "-<H>" : "<H>"
   if len(s:DBHEAD) != 1
     execute "%s/^\\(\\(.\\{-}\\(<H>\\|$\\)\\)\\{" . a:COL . "}\\)\\(.\\{-}\\)\\(<H>\\|$\\)/\\1" . SEPERATOR . "\\4\\5"
   endif
@@ -353,7 +402,7 @@ func RecordbufLeaveI_AddTableCol()
       call remove( s:DBHEAD, 1 )
     endif
     execute "b " . s:DBFILE
-    %s/^\(.\{-}\)<H>$/\1
+    %s/^\(.\{-}\)<H>.*$/\1
     b recordbuf
     2d
     let s:FIRSTENTRY = 0
@@ -462,9 +511,12 @@ endfunc
 "Intelligent Tab -> see also RecordbufLeaveI()
 func IntelligentTab( INRECORDVIEW )
   let FIRSTTAB = a:INRECORDVIEW
+  let s:TABMODE = 0
   if bufname('') != "recordbuf"
     execute bufwinnr("recordbuf") . "winc w"
     let FIRSTTAB = 1
+  elseif s:DBPOS[1] == 1
+    execute bufwinnr(s:DBFILE) . "winc w"
   endif
 
   if s:DBPOS[1] == 1
@@ -472,7 +524,6 @@ func IntelligentTab( INRECORDVIEW )
   endif
 
   let s:TABMODE = 1
-
 
   call ChangeTableEntry(line('.'))
 

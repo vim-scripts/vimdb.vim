@@ -1,11 +1,15 @@
-vimdb 0.4 - simple Database with Vim
+vimdb 1.0 - simple Database with Vim
+
+release Notes:
+I fixed many many bugs :P, many vim keys now behave very intuetively,
+but it is still possible to break the table, so watch your steps.
 
 description:
 This plugin is useful to store data in a database like Arangement
 
 WARNING
-1.) The plugin is still in an early state of development, do not store
-    important data using the plugin!
+1.) The development stage of the script has advanced, but i still will
+    not recommend to store important data to a *.vimdb table.
 2.) The script sets the global variable "virtualedit" to "all", this
     may cause problems in conjunction with other scripts (see :h
     virtualedit)
