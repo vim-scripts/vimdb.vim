@@ -7,9 +7,8 @@
 " Recommendation:
 " Place the following command into your .vimrc for a better overview:
 " au BufRead,BufNewFile *.vim set foldmarker=func,endfunc
-" Look_also_at: Settings and Mapping made locally for Database in
-" Function StartDb(); beware of a lot of local autocommands
-"
+" Look_also_at: readme!!!
+" 
 " TODO:
 " Write TODO
 
@@ -86,7 +85,9 @@ func StartDb()
   let s:BLONGEST = 0
   let s:FIRSTENTRY = 0
 
+  let s:TABMODE = 0
   let s:TABBUF = ""
+  let s:FIRSTTAB = 0
 
   call RefreshHeader()
 
@@ -96,7 +97,7 @@ func StartDb()
   nnoremap <buffer> o  :call AddTableRow("o")<CR>
   nnoremap <buffer> O  :call AddTableRow("O")<CR>
 
-  nnoremap <buffer> <TAB> :call IntelligentTab()<CR>
+  nnoremap <buffer> <TAB> :call IntelligentTab(0)<CR>
 
   badd recordbuf
   bnext
@@ -115,7 +116,8 @@ func StartDb()
   nnoremap <buffer> p  :call PasteTableCol("p")<CR>
   nnoremap <buffer> P  :call PasteTableCol("P")<CR>
 
-  inoremap <buffer> <TAB> <ESC>:call IntelligentTab()<CR>
+  inoremap <buffer> <TAB> <ESC>:call IntelligentTab(0)<CR>
+  nnoremap <buffer> <TAB>      :call IntelligentTab(1)<CR>
 
   execute 'vsplit ' . s:DBFILE
 endfunc
@@ -186,6 +188,13 @@ func RecordbufLeaveI()
   call ChangeTableEntry(line('.'))
   if s:DBPOS[1] == 1
     call RefreshHeader()
+  endif
+
+  if s:TABMODE == 1
+    let ENTRY = GetRecEntry(line("."))
+    if substitute(ENTRY, " ", "", "g") == ""
+      call SetRecEntry(".", s:TABBUF)
+    endif
   endif
 endfunc
 
@@ -450,36 +459,33 @@ func PasteTableCol( MODE )
 endfunc
 
 
-"Intelligent Tab
-func IntelligentTab()
-  if bufname('') == "recordbuf"
-    let ENTRY = GetRecEntry(line("."))
-    if substitute(ENTRY, " ", "", "g") == ""
-      call SetRecEntry(".", s:TABBUF)
-      if s:DBPOS[1] == 1
-	return
-      endif
-    endif
-    if line('.') != line('$')
-      call ChangeTableEntry(line('.'))
-      normal j
-      let s:TABBUF = GetRecEntry(line("."))
-      call SetRecEntry(".", "")
-      call cursor(0,0,s:LONGEST+1)
-      startinsert
-    else
-      call ChangeTableEntry(line('.'))
-      execute bufnr(s:DBFILE) . "winc w"
-    endif
-  else
+"Intelligent Tab -> see also RecordbufLeaveI()
+func IntelligentTab( INRECORDVIEW )
+  let FIRSTTAB = a:INRECORDVIEW
+  if bufname('') != "recordbuf"
     execute bufwinnr("recordbuf") . "winc w"
-    if s:DBPOS[1] == 1
-      return
+    let FIRSTTAB = 1
+  endif
+
+  if s:DBPOS[1] == 1
+    return
+  endif
+
+  let s:TABMODE = 1
+
+
+  call ChangeTableEntry(line('.'))
+
+  if line('.') != line('$')
+    if FIRSTTAB != 1
+      normal j
     endif
     let s:TABBUF = GetRecEntry(line("."))
     call SetRecEntry(".", "")
     call cursor(0,0,s:LONGEST+1)
     startinsert
+  else
+    execute bufnr(s:DBFILE) . "winc w"
   endif
 endfunc
 
@@ -548,9 +554,10 @@ func GetRecEntry( LINE )
 endfunc
 
 func SetRecEntry( LINE, ENTRY )
+  let RECENTRY = escape(a:ENTRY,'\/')
   if a:LINE == "."
-    execute "s/^\\(.\\{" . s:LONGEST . "}\\).*$/\\1" . a:ENTRY
+    execute "s/^\\(.\\{" . s:LONGEST . "}\\).*$/\\1" . RECENTRY
   else
-    execute a:LINE . "s/^\\(.\\{" . s:LONGEST . "}\\).*$/\\1" . a:ENTRY
+    execute a:LINE . "s/^\\(.\\{" . s:LONGEST . "}\\).*$/\\1" . RECENTRY
   endif
 endfunc

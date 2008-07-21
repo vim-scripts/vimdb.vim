@@ -30,34 +30,34 @@ Move the cursor into the record view and press "o" or "O" to create a
 new table column. Name the column and press ESC, a new column will be
 created on the left side in the table view. Repeat that several times.
 Now, after creating some columns, switch back to table view and create
-a new record by pressing "o" or "O". Whilst your cursor is on the new
-record, switch back to record view and hit i to edit the first Entry
-of the new record. Move the cursor to some other record and do it
-again!
+a new record by pressing "o".
+Now hit TAB; it will put the cursor into record view and start insert
+mode at the first entry. Edit entry and hit TAB again. Now hit TAB
+until you'll get back to table view.
 Congratulations, you created a new database
 
 
 useful mappings:
   
   In record view:
-  "o", "O" - create a new column
+  "o", "O" - append/insert a new column 
   "yy"     - copy column
   "dd"     - cut column
-  "p", "P" - paste column
+  "p", "P" - append/insert a cut column
   
   In table view:
-  "o", "O" - create a new record
+  "o", "O" - append/insert a new record
   "yy"     - copy record
   "dd"     - cut record
-  "p", "P" - paste record
+  "p", "P" - append/insert a cut record
 
-New mapping since version 0.4
-TAB is now mapped to a function, which is named IntelligentTab(). To
-use it, hit TAB in normal mode whilst in table view. It will get you
-on the first entry of the actual record into insert mode whilst
-clearing it out at the same time for new input. If you dont type in
-any input, it wont be changed, otherwise guess what will happen.
-If you dont want to behave TAB this way, uncomment the two mappings,
-made in the function StartDb() at the early beginning of the script.
-Note, that Tab will not work for the first record of the Table (the
-Header).
+Improved mapping for TAB since 0.5
+TAB is now the key to the heart of your database. Whilst in table
+view, it will take you to the first entry of record view, clearing it
+out for new input. If you type in something, it'll change the entry,
+otherwise not. Hitting TAB again will bring you to the next record,
+and so on, until you get to the last record and from that back to
+table view, or until you hit ESC, what will of course get you back to
+normal mode.
+Note, that this feature won't work for the first line of you table
+(the header with the colnames).
