@@ -23,9 +23,9 @@
 "Setting was moved into StartDb() due to otherwise beeing always
 "applied you open vim - sorry, my mistake.
 
-if exists("vimdbplugin")
-  finish
-endif
+"if exists("vimdbplugin")
+"  finish
+"endif
 let vimdbplugin = 2
 
 "Autocommands
@@ -39,6 +39,7 @@ au CursorMoved                       recordbuf call RecordbufMove()
 au InsertEnter                       recordbuf call RecordbufEnterI()
 au CursorMovedI                      recordbuf call RecordbufMoveI()
 au InsertLeave                       recordbuf call RecordbufLeaveI()
+au BufLeave                          recordbuf call LeaveRecordbuf()
 
 
 func ToggleAutocmd()
@@ -52,6 +53,7 @@ func ToggleAutocmd()
     au! CursorMoved                       recordbuf
     au! CursorMovedI                      recordbuf
     au! InsertLeave                       recordbuf
+    au! BufLeave                          recordbuf
   elseif s:AUTO == 0
     au CursorMoved,CursorMovedI,BufEnter *.vimdb   call TableChange()
     au BufRead,BufNewFile                *.vimdb   call StartDb()
@@ -62,6 +64,7 @@ func ToggleAutocmd()
     au CursorMoved                       recordbuf call RecordbufMove()
     au CursorMovedI                      recordbuf call RecordbufMoveI()
     au InsertLeave                       recordbuf call RecordbufLeaveI()
+    au BufLeave                          recordbuf call LeaveRecordbuf()
     let s:AUTO = 1
   endif
 endfunc
@@ -82,13 +85,18 @@ func StartDb()
   let s:LONGEST = 0
   let s:BLONGEST = 0
   let s:FIRSTENTRY = 0
+
+  let s:TABBUF = ""
+
   call RefreshHeader()
 
   setlocal tw=0
   setlocal bufhidden=hide
 
-  map <buffer> o  :call AddTableRow("o")<CR>
-  map <buffer> O  :call AddTableRow("O")<CR>
+  nnoremap <buffer> o  :call AddTableRow("o")<CR>
+  nnoremap <buffer> O  :call AddTableRow("O")<CR>
+
+  nnoremap <buffer> <TAB> :call IntelligentTab()<CR>
 
   badd recordbuf
   bnext
@@ -98,14 +106,16 @@ func StartDb()
   setlocal bufhidden=hide
   setlocal noswapfile
 
-  map <buffer> o  :call AddTableCol("o")<CR>
-  map <buffer> O  :call AddTableCol("O")<CR>
+  nnoremap <buffer> o  :call AddTableCol("o")<CR>
+  nnoremap <buffer> O  :call AddTableCol("O")<CR>
 
-  map <buffer> dd :call CutTableCol()<CR>
-  map <buffer> yy :call CopyTableCol()<CR>
+  nnoremap <buffer> dd :call CutTableCol()<CR>
+  nnoremap <buffer> yy :call CopyTableCol()<CR>
 
-  map <buffer> p  :call PasteTableCol("p")<CR>
-  map <buffer> P  :call PasteTableCol("P")<CR>
+  nnoremap <buffer> p  :call PasteTableCol("p")<CR>
+  nnoremap <buffer> P  :call PasteTableCol("P")<CR>
+
+  inoremap <buffer> <TAB> <ESC>:call IntelligentTab()<CR>
 
   execute 'vsplit ' . s:DBFILE
 endfunc
@@ -141,12 +151,15 @@ endfunc
 func RecordbufMove()
   if virtcol('.') <= s:LONGEST+1
     call cursor(0,0,s:LONGEST+1)
-    "call cursor(0,s:BLONGEST+1)
   endif
   if virtcol('.') <= s:LONGEST+1
     execute "s/.*$/" . escape(s:DBHEAD[line('.')-1],'\/') . " -"
     call cursor(0,0,s:LONGEST+1)
-    "call cursor(0,s:BLONGEST+1)
+  else
+    call ChangeTableEntry(line('.'))
+    if s:DBPOS[1] == 1
+      call RefreshHeader()
+    endif
   endif
 endfunc
 
@@ -170,7 +183,14 @@ func RecordbufMoveI()
 endfunc
 
 func RecordbufLeaveI()
-  call ChangeTableEntry()
+  call ChangeTableEntry(line('.'))
+  if s:DBPOS[1] == 1
+    call RefreshHeader()
+  endif
+endfunc
+
+func LeaveRecordbuf()
+  call ChangeTableEntry(line('.'))
   if s:DBPOS[1] == 1
     call RefreshHeader()
   endif
@@ -223,14 +243,14 @@ func RefreshRecord()
   call ToggleAutocmd()
 endfunc
 
-func ChangeTableEntry()
+func ChangeTableEntry( RECLINE )
   call ToggleAutocmd()
 
-  let RECENTRY = DelTrailingSpaces( strpart(getline('.'),s:BLONGEST) )
+  let RECENTRY = DelTrailingSpaces( strpart(getline(a:RECLINE),s:BLONGEST) )
   let RECENTRYL = Strlen(RECENTRY)
 
-  let RECLINE = line('.')
-  let TCOL = RECLINE
+  let RECPOS = getpos('.')
+  let TCOL = a:RECLINE
 
   execute ':b ' . s:DBFILE
   let RECENTRY = RECENTRY == "" ? "-" : RECENTRY
@@ -239,6 +259,7 @@ func ChangeTableEntry()
   call AdjustColWidth( TCOL )
 
   b! recordbuf
+  call setpos(".",RECPOS)
 
   call ToggleAutocmd()
 endfunc
@@ -429,6 +450,40 @@ func PasteTableCol( MODE )
 endfunc
 
 
+"Intelligent Tab
+func IntelligentTab()
+  if bufname('') == "recordbuf"
+    let ENTRY = GetRecEntry(line("."))
+    if substitute(ENTRY, " ", "", "g") == ""
+      call SetRecEntry(".", s:TABBUF)
+      if s:DBPOS[1] == 1
+	return
+      endif
+    endif
+    if line('.') != line('$')
+      call ChangeTableEntry(line('.'))
+      normal j
+      let s:TABBUF = GetRecEntry(line("."))
+      call SetRecEntry(".", "")
+      call cursor(0,0,s:LONGEST+1)
+      startinsert
+    else
+      call ChangeTableEntry(line('.'))
+      execute bufnr(s:DBFILE) . "winc w"
+    endif
+  else
+    execute bufwinnr("recordbuf") . "winc w"
+    if s:DBPOS[1] == 1
+      return
+    endif
+    let s:TABBUF = GetRecEntry(line("."))
+    call SetRecEntry(".", "")
+    call cursor(0,0,s:LONGEST+1)
+    startinsert
+  endif
+endfunc
+
+
 "Other Utilities
 func CreateColList( COLLIST, COL )
   call extend( a:COLLIST, getbufline(s:DBFILE,1,"$") )
@@ -486,4 +541,16 @@ endfunc
 
 func DelTrailingSpaces( STRING )
   return substitute(a:STRING, '^\(\S*\)\s*$', '\1', '' )
+endfunc
+
+func GetRecEntry( LINE )
+  return substitute(getbufline("recordbuf",a:LINE)[0], "^.\\{" . s:LONGEST . "}\\(.*\\)$", "\\1", "")
+endfunc
+
+func SetRecEntry( LINE, ENTRY )
+  if a:LINE == "."
+    execute "s/^\\(.\\{" . s:LONGEST . "}\\).*$/\\1" . a:ENTRY
+  else
+    execute a:LINE . "s/^\\(.\\{" . s:LONGEST . "}\\).*$/\\1" . a:ENTRY
+  endif
 endfunc

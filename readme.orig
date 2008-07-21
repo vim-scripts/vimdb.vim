@@ -1,4 +1,4 @@
-vimdb 0.3 - simple Database with Vim
+vimdb 0.4 - simple Database with Vim
 
 description:
 This plugin is useful to store data in a database like Arangement
@@ -11,6 +11,13 @@ WARNING
     virtualedit)
 3.) Beware that a lot of autocommands are in use; look into the
     script, to see, where they apply.
+
+Note:
+1.) Have a look at example database which may be shipped with the
+    script!
+2.) If you encounter something you'd like to report (bug or something
+    like this) write me a mail, i will collect bugs and maybe once
+    clear them out.
 
 short introduction:
 Create a *.vimdb file and open it with Vim. Notice, that two windows
@@ -29,6 +36,7 @@ of the new record. Move the cursor to some other record and do it
 again!
 Congratulations, you created a new database
 
+
 useful mappings:
   
   In record view:
@@ -42,3 +50,14 @@ useful mappings:
   "yy"     - copy record
   "dd"     - cut record
   "p", "P" - paste record
+
+New mapping since version 0.4
+TAB is now mapped to a function, which is named IntelligentTab(). To
+use it, hit TAB in normal mode whilst in table view. It will get you
+on the first entry of the actual record into insert mode whilst
+clearing it out at the same time for new input. If you dont type in
+any input, it wont be changed, otherwise guess what will happen.
+If you dont want to behave TAB this way, uncomment the two mappings,
+made in the function StartDb() at the early beginning of the script.
+Note, that Tab will not work for the first record of the Table (the
+Header).
