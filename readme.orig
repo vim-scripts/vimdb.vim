@@ -1,0 +1,44 @@
+vimdb 0.3 - simple Database with Vim
+
+description:
+This plugin is useful to store data in a database like Arangement
+
+WARNING
+1.) The plugin is still in an early state of development, do not store
+    important data using the plugin!
+2.) The script sets the global variable "virtualedit" to "all", this
+    may cause problems in conjunction with other scripts (see :h
+    virtualedit)
+3.) Beware that a lot of autocommands are in use; look into the
+    script, to see, where they apply.
+
+short introduction:
+Create a *.vimdb file and open it with Vim. Notice, that two windows
+will open, the "table view" on the left and the "record view" on the 
+right. The table view will show your database in the normal table 
+layout, the record view will show the actual record, the cursor is 
+currently over (in an empty database, of course, you will see two 
+empty windows).
+Move the cursor into the record view and press "o" or "O" to create a
+new table column. Name the column and press ESC, a new column will be
+created on the left side in the table view. Repeat that several times.
+Now, after creating some columns, switch back to table view and create
+a new record by pressing "o" or "O". Whilst your cursor is on the new
+record, switch back to record view and hit i to edit the first Entry
+of the new record. Move the cursor to some other record and do it
+again!
+Congratulations, you created a new database
+
+useful mappings:
+  
+  In record view:
+  "o", "O" - create a new column
+  "yy"     - copy column
+  "dd"     - cut column
+  "p", "P" - paste column
+  
+  In table view:
+  "o", "O" - create a new record
+  "yy"     - copy record
+  "dd"     - cut record
+  "p", "P" - paste record

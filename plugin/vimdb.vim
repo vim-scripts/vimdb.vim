@@ -23,10 +23,10 @@
 "Setting was moved into StartDb() due to otherwise beeing always
 "applied you open vim - sorry, my mistake.
 
-"if exists("vimdbplugin")
-"  finish
-"endif
-let vimdbplugin = 1
+if exists("vimdbplugin")
+  finish
+endif
+let vimdbplugin = 2
 
 "Autocommands
 au BufRead,BufNewFile                *.vimdb   call StartDb()
@@ -81,6 +81,7 @@ func StartDb()
   let s:DBHEAD = []
   let s:LONGEST = 0
   let s:BLONGEST = 0
+  let s:FIRSTENTRY = 0
   call RefreshHeader()
 
   setlocal tw=0
@@ -101,6 +102,7 @@ func StartDb()
   map <buffer> O  :call AddTableCol("O")<CR>
 
   map <buffer> dd :call CutTableCol()<CR>
+  map <buffer> yy :call CopyTableCol()<CR>
 
   map <buffer> p  :call PasteTableCol("p")<CR>
   map <buffer> P  :call PasteTableCol("P")<CR>
@@ -178,6 +180,7 @@ endfunc
 "Functions primarily accessed by autocommand Functions
 func RefreshHeader()
   let s:DBHEAD = split(getbufline(s:DBFILE,1)[0],'\s*<H>\s*', 1)
+
   let LEN = len(s:DBHEAD)
   let s:DBHEAD[LEN-1] = DelTrailingSpaces(s:DBHEAD[LEN-1])
 
@@ -248,12 +251,17 @@ func AddTableCol( MODE )
 
   let PREPEND = a:MODE ==# "O"
 
-  call append(line('.') - PREPEND,"")
-  call cursor(line('.') + 1 - PREPEND*2, 1)
-  startinsert
+  if line('$') == line('.') && len(getline('.')) == 1
+    let s:FIRSTENTRY = 1
+    startinsert
+  else
+    let s:RECLINES = s:RECLINES + 1
+    call append(line('.') - PREPEND,"")
+    call cursor(line('.') + 1 - PREPEND*2, 1)
+    startinsert
+  endif
 
   let s:RECPOS = getpos('.')
-  let s:RECLINES = s:RECLINES + 1
 
   call InsertTableCol(s:RECPOS[1] - 1)
 
@@ -275,7 +283,9 @@ func InsertTableCol( COL )
   endwhile
 
   let SEPERATOR = "<H>"
-  execute "%s/^\\(\\(.\\{-}\\(<H>\\|$\\)\\)\\{" . a:COL . "}\\)\\(.\\{-}\\)\\(<H>\\|$\\)/\\1" . SEPERATOR . "\\4\\5"
+  if len(s:DBHEAD) != 1
+    execute "%s/^\\(\\(.\\{-}\\(<H>\\|$\\)\\)\\{" . a:COL . "}\\)\\(.\\{-}\\)\\(<H>\\|$\\)/\\1" . SEPERATOR . "\\4\\5"
+  endif
 
   execute "b! " . BUFFER
 endfunc
@@ -307,6 +317,20 @@ func RecordbufLeaveI_AddTableCol()
 
   au! CursorMovedI recordbuf
   au! InsertLeave  recordbuf
+
+  if s:FIRSTENTRY == 1
+    if len(s:DBHEAD) == 2
+      call remove( s:DBHEAD, 1 )
+    endif
+    execute "b " . s:DBFILE
+    %s/^\(.\{-}\)<H>$/\1
+    b recordbuf
+    2d
+    let s:FIRSTENTRY = 0
+  endif
+
+  call setpos('.',s:RECPOS)
+
   let s:AUTO = 0
   call ToggleAutocmd()
 endfunc
@@ -352,7 +376,24 @@ func CutTableCol()
   let COLPAT = "\\(.\\{-}\\(<H>\\|$\\)\\)"
   execute "%s/^\\(" . COLPAT . "\\{" . DEC_COL . "}\\)" . COLPAT . "\\(" . COLPAT . "*\\)/\\1\\6"
 
+  if len(s:DBHEAD) == COL
+    silent %s/^\(.\{-}\)<H>$/\1/
+  endif
+
   call remove( s:DBHEAD, COL-1 )
+
+  call ToggleAutocmd()
+  b recordbuf
+endfunc
+
+func CopyTableCol()
+  let COL = line(".")
+
+  call ToggleAutocmd()
+  execute ':b ' . s:DBFILE
+
+  let s:CUTLIST = []
+  call CreateColList( s:CUTLIST, COL )
 
   call ToggleAutocmd()
   b recordbuf
@@ -384,6 +425,7 @@ func PasteTableCol( MODE )
   b recordbuf
 
   call RefreshRecord()
+  call cursor(COL - APPEND, 0)
 endfunc
 
 
