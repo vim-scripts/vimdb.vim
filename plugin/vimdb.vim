@@ -1,5 +1,5 @@
 " Description: Vim plugin to simulate a simple database
-" Last Change: 2008 Jul 20
+" Last Change: 2008 Jul 21
 " Author:      Benjamin Schnitzler <benschni at yahoo dot de>
 " License:     This file is placed in the public domain.
 "
@@ -19,7 +19,14 @@
 "bytelength. It may cause Problems with other scripts.
 "If you plan to unset it, you have to change the cursor command used 
 "in RecordbufMove() and RecordbufMoveI() a bit.
-set virtualedit=all
+"set virtualedit=all
+"Setting was moved into StartDb() due to otherwise beeing always
+"applied you open vim - sorry, my mistake.
+
+"if exists("vimdbplugin")
+"  finish
+"endif
+let vimdbplugin = 1
 
 "Autocommands
 au BufRead,BufNewFile                *.vimdb   call StartDb()
@@ -62,13 +69,14 @@ endfunc
 
 "Autocommand Functions for *.vimdb
 func StartDb()
+  set virtualedit=all
 
   let s:AUTO = 1
 
   let s:DBFILE = bufname("")
   let s:DBPOS = getpos(".")
 
-  let s:COLLIST = []
+  let s:CUTLIST = []
 
   let s:DBHEAD = []
   let s:LONGEST = 0
@@ -78,6 +86,8 @@ func StartDb()
   setlocal tw=0
   setlocal bufhidden=hide
 
+  map <buffer> o  :call AddTableRow("o")<CR>
+  map <buffer> O  :call AddTableRow("O")<CR>
 
   badd recordbuf
   bnext
@@ -87,8 +97,13 @@ func StartDb()
   setlocal bufhidden=hide
   setlocal noswapfile
 
-  map o :call AddTableCol("o")<CR>
-  map O :call AddTableCol("O")<CR>
+  map <buffer> o  :call AddTableCol("o")<CR>
+  map <buffer> O  :call AddTableCol("O")<CR>
+
+  map <buffer> dd :call CutTableCol()<CR>
+
+  map <buffer> p  :call PasteTableCol("p")<CR>
+  map <buffer> P  :call PasteTableCol("P")<CR>
 
   execute 'vsplit ' . s:DBFILE
 endfunc
@@ -234,7 +249,7 @@ func AddTableCol( MODE )
   let PREPEND = a:MODE ==# "O"
 
   call append(line('.') - PREPEND,"")
-  call cursor(line('.') + 1 - PREPEND*2, 0)
+  call cursor(line('.') + 1 - PREPEND*2, 1)
   startinsert
 
   let s:RECPOS = getpos('.')
@@ -259,7 +274,7 @@ func InsertTableCol( COL )
     let LEN = LEN - 1
   endwhile
 
-  let SEPERATOR = a:COL == len(s:DBHEAD)-1 ? "<H>-" : "-<H>"
+  let SEPERATOR = "<H>"
   execute "%s/^\\(\\(.\\{-}\\(<H>\\|$\\)\\)\\{" . a:COL . "}\\)\\(.\\{-}\\)\\(<H>\\|$\\)/\\1" . SEPERATOR . "\\4\\5"
 
   execute "b! " . BUFFER
@@ -296,15 +311,79 @@ func RecordbufLeaveI_AddTableCol()
   call ToggleAutocmd()
 endfunc
 
-"CutTableCol Functions
-func CutTableCol( MODE )
-  call ToggleAutocmd()
-  let s.AUTO = 2
 
+"AddTableRow Function
+func AddTableRow( MODE )
+  call ToggleAutocmd()
+
+  let PREPEND = a:MODE ==# "O"
+
+  let HEADROW = getline(1)
+  let SHEADROW = split(HEADROW,"<H>",1)
+
+  let MAXINDEX = len(SHEADROW)
+  let INDEX = 0
+  while INDEX < MAXINDEX
+    let SHEADROW[INDEX] = substitute(SHEADROW[INDEX], ".", " ", "g")
+    let INDEX = INDEX + 1
+  endwhile
+
+  let NEWROW = join(SHEADROW,"<H>")
+  call append(line('.') - PREPEND,NEWROW)
+  call cursor(line('.') + 1 - PREPEND*2, 1)
+
+  call ToggleAutocmd()
+endfunc
+
+
+"Functions used to cut & paste columns
+func CutTableCol()
+  call ToggleAutocmd()
+
+  let COL = line(".")
+  let DEC_COL = COL-1
   d
 
-  let s.AUTO = 0
+  execute ':b ' . s:DBFILE
+
+  let s:CUTLIST = []
+  call CreateColList( s:CUTLIST, COL )
+
+  let COLPAT = "\\(.\\{-}\\(<H>\\|$\\)\\)"
+  execute "%s/^\\(" . COLPAT . "\\{" . DEC_COL . "}\\)" . COLPAT . "\\(" . COLPAT . "*\\)/\\1\\6"
+
+  call remove( s:DBHEAD, COL-1 )
+
   call ToggleAutocmd()
+  b recordbuf
+endfunc
+
+func PasteTableCol( MODE )
+  call ToggleAutocmd()
+
+  let APPEND = a:MODE ==# "p"
+  let COL = line(".") + APPEND
+
+  execute "b! " . s:DBFILE
+
+  call insert(s:DBHEAD, get(s:CUTLIST,0,"-"), COL-1)
+
+  call InsertTableCol(COL-1)
+  let INDEX = 1
+  let MAXLINE = line("$")
+  while INDEX <= MAXLINE
+    call InsertTableCell( get(s:CUTLIST,INDEX-1,"-"), INDEX, COL-1 )
+    let INDEX = INDEX + 1
+  endwhile
+
+  call RefreshHeader()
+  call AdjustColWidth(COL)
+
+  call ToggleAutocmd()
+
+  b recordbuf
+
+  call RefreshRecord()
 endfunc
 
 
